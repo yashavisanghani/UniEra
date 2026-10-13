@@ -1,0 +1,14 @@
+# Node / React
+node_modules/
+dist/
+
+# Python / Flask
+venv/
+__pycache__/
+*.pyc
+
+# Misc
+.env
+.DS_Store
+# Student uploads (created at runtime)
+uniera-backend/uploads/

@@ -1,0 +1,186 @@
+import { useState } from "react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
+import { User, Mail, Lock, Phone } from "lucide-react";
+import AuthSidePanel from "../components/AuthSidePanel";
+import { api, saveSession, errMsg } from "../api";
+
+export default function Signup() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [form, setForm] = useState({
+    full_name: "",
+    phone_number: "",
+    email: "",
+    password: "",
+    confirm_password: "",
+  });
+  const [agreed, setAgreed] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+
+    if (form.password !== form.confirm_password) {
+      setError("Passwords do not match");
+      return;
+    }
+    if (!agreed) {
+      setError("Please agree to the Terms & Conditions");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await api.post("/signup", form);
+      // log the new student in straight away so they can continue to enrolment
+      const res = await api.post("/login", { email: form.email, password: form.password });
+      saveSession(res.data);
+      navigate(location.state?.from || "/enroll", { replace: true });
+    } catch (err) {
+      setError(errMsg(err, "Signup failed"));
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="flex h-screen overflow-hidden">
+      <AuthSidePanel
+        heading={
+          <>
+            Your Path Abroad,
+            <br />
+            Made Easy.
+          </>
+        }
+        description="Access the world's most prestigious universities and scholarships with our premium global education platform."
+      />
+
+      <div className="flex-1 overflow-y-auto bg-white">
+        <div className="flex justify-center px-6 py-16">
+          <div className="w-full max-w-md">
+            <h2 className="text-3xl font-bold text-gray-900 mb-1">Create Account</h2>
+            <p className="text-gray-500 mb-6">
+              Please enter your details to begin your journey.
+            </p>
+
+            <div className="grid grid-cols-2 bg-gray-100 rounded-xl p-1 mb-6">
+              <Link
+                to="/login"
+                state={location.state}
+                className="text-center py-2.5 rounded-lg text-gray-500 hover:text-gray-800 transition"
+              >
+                Login
+              </Link>
+              <span className="text-center py-2.5 rounded-lg bg-white shadow-sm font-medium text-gray-900">
+                Signup
+              </span>
+            </div>
+
+            {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+
+            <form onSubmit={handleSubmit}>
+              <label className="text-sm font-medium text-gray-700">Full Name</label>
+              <div className="relative mt-1 mb-4">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  type="text"
+                  name="full_name"
+                  placeholder="John Doe"
+                  value={form.full_name}
+                  onChange={handleChange}
+                  required
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+
+              <label className="text-sm font-medium text-gray-700">Phone Number</label>
+              <div className="relative mt-1 mb-4">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  type="tel"
+                  name="phone_number"
+                  placeholder="9876543210"
+                  value={form.phone_number}
+                  onChange={handleChange}
+                  required
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+
+              <label className="text-sm font-medium text-gray-700">Email Address</label>
+              <div className="relative mt-1 mb-4">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="name@example.com"
+                  value={form.email}
+                  onChange={handleChange}
+                  required
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+
+              <label className="text-sm font-medium text-gray-700">Password</label>
+              <div className="relative mt-1 mb-4">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  type="password"
+                  name="password"
+                  placeholder="Create a password"
+                  value={form.password}
+                  onChange={handleChange}
+                  required
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+
+              <label className="text-sm font-medium text-gray-700">Confirm Password</label>
+              <div className="relative mt-1 mb-3">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  type="password"
+                  name="confirm_password"
+                  placeholder="Re-enter your password"
+                  value={form.confirm_password}
+                  onChange={handleChange}
+                  required
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-gray-600 mb-6">
+                <input
+                  type="checkbox"
+                  className="rounded"
+                  checked={agreed}
+                  onChange={(e) => setAgreed(e.target.checked)}
+                />
+                I agree to the Terms &amp; Conditions
+              </label>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-[#1e1147] to-[#7c3aed] text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-50"
+              >
+                {loading ? "Creating account..." : "Create Account \u2192"}
+              </button>
+            </form>
+
+            <p className="text-sm text-center text-gray-500 mt-6">
+              Already have an account?{" "}
+              <Link to="/login" state={location.state} className="text-violet-600 font-medium hover:underline">
+                Login
+              </Link>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
