@@ -102,3 +102,4 @@ Conditional / Unconditional Offer (or Rejected) → Offer Accepted → CoE Issue
 - Loan interest rates, test-prep batches and accommodation listings are **indicative sample data**.
 - Students log in with a stored user id (fine for a prototype); the counsellor desk uses a signed token.
 - Reviews on the home page appear only after enrolled students post them (no fake reviews).
+-    DevOps SLA 2026 - edited on GitHub
