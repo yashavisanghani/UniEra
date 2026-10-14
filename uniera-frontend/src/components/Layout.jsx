@@ -1,5 +1,5 @@
 // Public website layout: top navbar with "Enroll Now" on the top-right, footer, chatbot.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { Menu, X, LayoutDashboard, LogOut, Phone, Mail, MapPin } from "lucide-react";
 import ChatbotWidget from "./ChatbotWidget";
@@ -16,8 +16,15 @@ const NAV = [
 
 export function PublicNavbar() {
   const navigate = useNavigate();
-  const user = currentUser();
+  const [user, setUser] = useState(currentUser());
   const [open, setOpen] = useState(false);
+
+  // refresh when someone logs in / out / enrols on this page (e.g. inside the enrolment form)
+  useEffect(() => {
+    const refresh = () => setUser(currentUser());
+    window.addEventListener("auth-change", refresh);
+    return () => window.removeEventListener("auth-change", refresh);
+  }, []);
 
   const out = () => {
     logout();

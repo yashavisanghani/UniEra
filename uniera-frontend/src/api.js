@@ -32,12 +32,17 @@ export const saveSession = (d) => {
   localStorage.setItem("email", d.email || "");
   localStorage.setItem("is_enrolled", String(!!d.is_enrolled));
   localStorage.setItem("has_profile", String(!!d.has_profile));
+  window.dispatchEvent(new Event("auth-change")); // tell the navbar to refresh
 };
 
-export const setEnrolled = (v = true) => localStorage.setItem("is_enrolled", String(v));
+export const setEnrolled = (v = true) => {
+  localStorage.setItem("is_enrolled", String(v));
+  window.dispatchEvent(new Event("auth-change"));
+};
 
 export const logout = () => {
   ["user_id", "name", "email", "is_enrolled", "has_profile"].forEach((k) => localStorage.removeItem(k));
+  window.dispatchEvent(new Event("auth-change"));
 };
 
 export const inr = (n) => `₹${Math.round(Number(n || 0)).toLocaleString("en-IN")}`;

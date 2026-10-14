@@ -1,0 +1,79 @@
+# UniEra – SLA Task 5, Playbook 1: install the software the project needs
+# Run on Ansible_Server:   ansible-playbook install_uniera_software.yml
+---
+- name: Install software needed by UniEra (React + Flask + MySQL)
+  hosts: uniera_servers
+  become: yes
+
+  tasks:
+
+    - name: Update apt package cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install Git, Python, pip, venv, MySQL server and Nginx
+      apt:
+        name:
+          - git
+          - curl
+          - python3
+          - python3-pip
+          - python3-venv
+          - mysql-server
+          - nginx
+        state: present
+
+    # Vite 8 (used by the React frontend) needs Node.js 20+, Ubuntu's own nodejs is older
+    - name: Check Node.js version
+      command: node --version
+      register: node_check
+      changed_when: false
+      failed_when: false
+
+    - name: Add NodeSource repository for Node.js 22
+      shell: curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+      when: node_check.rc != 0 or not node_check.stdout.startswith('v22')
+
+    - name: Install Node.js 22 (includes npm)
+      apt:
+        name: nodejs
+        state: latest
+      when: node_check.rc != 0 or not node_check.stdout.startswith('v22')
+
+    # free-tier EC2 has only 1 GB RAM – a swap file stops npm install / MySQL running out of memory
+    - name: Create 1 GB swap file
+      command: fallocate -l 1G /swapfile
+      args:
+        creates: /swapfile
+      register: swap_made
+
+    - name: Activate swap
+      shell: chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+      when: swap_made.changed
+
+    - name: Start and enable MySQL
+      service:
+        name: mysql
+        state: started
+        enabled: yes
+
+    - name: Start and enable Nginx
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Collect installed versions
+      shell: |
+        echo "git    : $(git --version)"
+        echo "python : $(python3 --version)"
+        echo "node   : $(node --version)   npm: $(npm --version)"
+        echo "mysql  : $(mysql --version)"
+        echo "nginx  : $(nginx -v 2>&1)"
+      register: versions
+      changed_when: false
+
+    - name: Show installed versions
+      debug:
+        msg: "{{ versions.stdout_lines }}"

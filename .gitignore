@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Node / React
 node_modules/
 dist/
@@ -13,12 +12,9 @@ __pycache__/
 .DS_Store
 # Student uploads (created at runtime)
 uniera-backend/uploads/
-=======
-node_modules/
-venv/
-__pycache__/
-.env
-*.env
-.vscode/
+
+# DevOps outputs
 *.log
->>>>>>> f7cc527880b4d30cc38f9ff9a9d54e623d718278
+selenium-results.xml
+report.html
+devops/selenium/screenshots/

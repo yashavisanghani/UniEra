@@ -1,9 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-<<<<<<< HEAD
 import Layout from "./components/Layout";
 import PortalLayout from "./components/PortalLayout";
 import AdminLayout from "./components/AdminLayout";
-import { RequireAuth, RequireEnrolled, RequireStaff } from "./components/RequireAuth";
+import { RequireEnrolled, RequireStaff } from "./components/RequireAuth";
 
 // public website
 import Home from "./pages/Home";
@@ -56,7 +55,7 @@ export default function App() {
         <Route path="/track" element={pub(<TrackApplication />)} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="/enroll" element={<RequireAuth>{pub(<Enroll />)}</RequireAuth>} />
+        <Route path="/enroll" element={pub(<Enroll />)} />
         <Route path="/enroll-now" element={<Navigate to="/enroll" replace />} />
 
         {/* ---------- student portal: only after enrolment + payment ---------- */}
@@ -90,26 +89,7 @@ export default function App() {
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
-=======
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import EnrollNow from "./pages/EnrollNow";
-
-function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Navigate to="/login" />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/enroll-now" element={<EnrollNow />} />
->>>>>>> f7cc527880b4d30cc38f9ff9a9d54e623d718278
       </Routes>
     </BrowserRouter>
   );
 }
-<<<<<<< HEAD
-=======
-
-export default App;
->>>>>>> f7cc527880b4d30cc38f9ff9a9d54e623d718278

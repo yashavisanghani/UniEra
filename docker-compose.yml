@@ -1,0 +1,70 @@
+# UniEra – full stack in Docker (SLA Task 4)
+#   docker compose up --build        -> start MySQL + Flask + React
+#   http://localhost:3000/signup     -> registration page
+#   http://localhost:3000/login       -> login page
+#   http://localhost:8081            -> phpMyAdmin (see the signup table)
+#   docker compose down              -> stop   (add -v to also delete the database volume)
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: uniera-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: uniera
+    ports:
+      - "3307:3306"            # 3307 on your PC so it doesn't clash with XAMPP's 3306
+    volumes:
+      - db_data:/var/lib/mysql
+      # these .sql files run automatically the first time the database is created
+      - ./database/01_core_tables_reference.sql:/docker-entrypoint-initdb.d/01_core.sql
+      - ./database/02_sample_data_fresh_install_only.sql:/docker-entrypoint-initdb.d/02_data.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  backend:
+    build: ./uniera-backend
+    image: uniera-backend:1.0
+    container_name: uniera-backend
+    environment:
+      DB_HOST: db              # the service name above = hostname inside the Docker network
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: uniera
+    ports:
+      - "5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+
+  frontend:
+    build:
+      context: ./uniera-frontend
+      args:
+        VITE_API_URL: http://localhost:5000
+    image: uniera-frontend:1.0
+    container_name: uniera-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+  # see the database in the browser (like mongo-express in Expt 9)
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: uniera-phpmyadmin
+    environment:
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: root
+    ports:
+      - "8081:80"
+    depends_on:
+      - db
+
+volumes:
+  db_data:

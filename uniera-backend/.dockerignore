@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+venv/
+.env
+# never copy students' uploaded documents into an image
+uploads/
+package-lock.json

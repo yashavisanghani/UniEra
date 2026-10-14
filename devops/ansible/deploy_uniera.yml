@@ -1,0 +1,122 @@
+# UniEra – SLA Task 5, Playbook 2 (bonus): deploy UniEra from GitHub onto the managed host
+# Run on Ansible_Server:   ansible-playbook deploy_uniera.yml
+# Afterwards open  http://<host public IP>/   (allow ports 80 and 5000 in the host's security group)
+---
+- name: Deploy UniEra on the web server
+  hosts: uniera_servers
+  become: yes
+
+  vars:
+    repo_url: https://github.com/YOUR-USERNAME/UniEra.git     # <-- your PUBLIC GitHub repo (Task 1)
+    app_dir: /opt/uniera
+    db_name: uniera
+    db_user: uniera
+    db_password: "Uniera@123"
+    server_ip: "{{ ansible_host }}"
+
+  tasks:
+
+    - name: Clone UniEra from GitHub
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_dir }}"
+        version: main
+        force: yes
+
+    # ---------- database ----------
+    - name: Check if the uniera database exists
+      command: mysql -N -e "SHOW DATABASES LIKE '{{ db_name }}'"
+      register: db_check
+      changed_when: false
+
+    - name: Create tables (first time only)
+      shell: mysql < {{ app_dir }}/database/01_core_tables_reference.sql
+      when: db_check.stdout == ""
+
+    - name: Load sample data (first time only)
+      shell: mysql {{ db_name }} < {{ app_dir }}/database/02_sample_data_fresh_install_only.sql
+      when: db_check.stdout == ""
+
+    - name: Create MySQL user for the app
+      command: >
+        mysql -e "CREATE USER IF NOT EXISTS '{{ db_user }}'@'localhost' IDENTIFIED BY '{{ db_password }}';
+        GRANT ALL PRIVILEGES ON {{ db_name }}.* TO '{{ db_user }}'@'localhost'; FLUSH PRIVILEGES;"
+      changed_when: false
+
+    # ---------- backend (Flask) ----------
+    - name: Install backend Python libraries in a virtual environment
+      pip:
+        requirements: "{{ app_dir }}/uniera-backend/requirements.txt"
+        virtualenv: "{{ app_dir }}/uniera-backend/venv"
+        virtualenv_command: python3 -m venv
+
+    - name: Create a service so the backend keeps running
+      copy:
+        dest: /etc/systemd/system/uniera-backend.service
+        content: |
+          [Unit]
+          Description=UniEra Flask backend
+          After=network.target mysql.service
+
+          [Service]
+          WorkingDirectory={{ app_dir }}/uniera-backend
+          Environment=DB_USER={{ db_user }}
+          Environment=DB_PASSWORD={{ db_password }}
+          Environment=FLASK_HOST=0.0.0.0
+          Environment=FLASK_DEBUG=0
+          ExecStart={{ app_dir }}/uniera-backend/venv/bin/python app.py
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Start the backend service
+      systemd:
+        name: uniera-backend
+        state: restarted
+        enabled: yes
+        daemon_reload: yes
+
+    # ---------- frontend (React) ----------
+    - name: npm install
+      command: npm install
+      args:
+        chdir: "{{ app_dir }}/uniera-frontend"
+
+    - name: Build the React app (pointing it at this server's backend)
+      command: npm run build
+      args:
+        chdir: "{{ app_dir }}/uniera-frontend"
+      environment:
+        VITE_API_URL: "http://{{ server_ip }}:5000"
+
+    - name: Copy the built website into the Nginx web folder
+      copy:
+        src: "{{ app_dir }}/uniera-frontend/dist/"
+        dest: /var/www/html/
+        remote_src: yes
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
+    - name: Nginx config so /login, /signup etc. work (React Router)
+      copy:
+        dest: /etc/nginx/sites-available/default
+        content: |
+          server {
+              listen 80 default_server;
+              root /var/www/html;
+              index index.html;
+              location / {
+                  try_files $uri $uri/ /index.html;
+              }
+          }
+
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
+
+    - name: Done
+      debug:
+        msg: "UniEra is live at http://{{ server_ip }}/   (backend: http://{{ server_ip }}:5000/api/hello)"

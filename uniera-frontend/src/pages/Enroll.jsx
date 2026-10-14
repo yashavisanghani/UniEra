@@ -1,11 +1,12 @@
-// Enrolment wizard (/enroll) — the student must be logged in (RequireAuth in App.jsx).
+// Enrolment wizard (/enroll) — open to everyone.
+//   Not logged in? Step 1 also creates the account (POST /signup + /login) before saving the profile.
 //   Step 1  Profile   -> POST /enroll (multipart: all profile fields + 5 documents)
 //   Step 2  Package   -> GET /packages
 //   Step 3  Payment   -> POST /payments/enrollment (demo gateway)
 //   Step 4  Success   -> receipt + link to the Student Portal
 // If the student is already enrolled we just show a "You're enrolled" card.
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   User,
   Phone,
@@ -18,12 +19,13 @@ import {
   ChevronDown,
   Check,
   CircleCheck,
+  KeyRound,
   PartyPopper,
   ArrowLeft,
   ArrowRight,
   LayoutDashboard,
 } from "lucide-react";
-import { api, currentUser, setEnrolled, errMsg, inr, fmtDate } from "../api";
+import { api, currentUser, saveSession, setEnrolled, errMsg, inr, fmtDate } from "../api";
 import { Card, Button, Field, Alert, Spinner, inputCls } from "../components/ui";
 import PaymentForm from "../components/PaymentForm";
 
@@ -132,15 +134,16 @@ const STEPS = ["Profile", "Package", "Payment", "Done"];
 
 // ---------------------------------------------------------------- main page
 export default function Enroll() {
-  const user = currentUser();
-  const [status, setStatus] = useState(null); // response of /enrollment/status
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(currentUser()); // null for visitors — the form creates the account
+  const [status, setStatus] = useState(user ? null : { has_profile: false }); // response of /enrollment/status
+  const [loading, setLoading] = useState(!!user);
   const [error, setError] = useState("");
   const [step, setStep] = useState(1);
   const [pkg, setPkg] = useState(null); // chosen package object
   const [receipt, setReceipt] = useState(null);
 
   useEffect(() => {
+    if (!user) return; // visitor: nothing to check yet
     api
       .get(`/enrollment/status/${user.id}`)
       .then((r) => {
@@ -152,7 +155,8 @@ export default function Enroll() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onProfileSaved = () => {
+  const onProfileSaved = (newUser) => {
+    if (newUser) setUser(newUser);
     localStorage.setItem("has_profile", "true");
     setStatus((s) => ({ ...s, has_profile: true }));
     setStep(2);
@@ -265,7 +269,9 @@ function AlreadyEnrolled({ status }) {
 
 // ---------------------------------------------------------------- step 1: profile
 function ProfileStep({ user, hasProfile, onSaved, onSkip }) {
-  const [form, setForm] = useState({ ...EMPTY_FORM, full_name: user.name, email: user.email });
+  const [form, setForm] = useState({ ...EMPTY_FORM, full_name: user?.name || "", email: user?.email || "" });
+  const [account, setAccount] = useState({ password: "", confirm_password: "" }); // only for visitors
+  const [emailTaken, setEmailTaken] = useState(false);
   const [files, setFiles] = useState({});
   const [existingFiles, setExistingFiles] = useState({}); // files already saved in a previous profile
   const [open, setOpen] = useState(0); // which section is expanded
@@ -275,7 +281,7 @@ function ProfileStep({ user, hasProfile, onSaved, onSkip }) {
 
   // If a profile already exists, load it so the student can edit instead of retyping
   useEffect(() => {
-    if (!hasProfile) return;
+    if (!hasProfile || !user) return;
     api
       .get(`/profile/${user.id}`)
       .then((r) => {
@@ -318,15 +324,47 @@ function ProfileStep({ user, hasProfile, onSaved, onSkip }) {
       return;
     }
 
-    const data = new FormData();
-    data.append("user_id", user.id);
-    Object.entries(form).forEach(([k, v]) => data.append(k, v));
-    Object.entries(files).forEach(([k, file]) => file && data.append(k, file));
+    if (!user) {
+      if (account.password.length < 6) {
+        setError("Choose a password of at least 6 characters for your UniEra account.");
+        return;
+      }
+      if (account.password !== account.confirm_password) {
+        setError("Passwords do not match.");
+        return;
+      }
+    }
 
     setSaving(true);
+    setEmailTaken(false);
     try {
+      // 1) visitor: create the account and log in first
+      let current = user;
+      if (!current) {
+        try {
+          await api.post("/signup", {
+            full_name: form.full_name,
+            email: form.email,
+            phone_number: form.phone_number,
+            password: account.password,
+            confirm_password: account.confirm_password,
+          });
+        } catch (err) {
+          if (err?.response?.status === 409) setEmailTaken(true);
+          throw err;
+        }
+        const res = await api.post("/login", { email: form.email, password: account.password });
+        saveSession(res.data);
+        current = currentUser();
+      }
+
+      // 2) save the enrolment profile
+      const data = new FormData();
+      data.append("user_id", current.id);
+      Object.entries(form).forEach(([k, v]) => data.append(k, v));
+      Object.entries(files).forEach(([k, file]) => file && data.append(k, file));
       await api.post("/enroll", data);
-      onSaved();
+      onSaved(user ? null : current);
     } catch (err) {
       setError(errMsg(err));
     }
@@ -354,6 +392,34 @@ function ProfileStep({ user, hasProfile, onSaved, onSkip }) {
 
   return (
     <form onSubmit={submit} className="space-y-3" noValidate>
+      {!user && (
+        <Card className="p-6 border-violet-200 bg-violet-50/40">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <span className="w-9 h-9 rounded-lg bg-violet-100 text-[#7c3aed] flex items-center justify-center">
+                <KeyRound size={18} />
+              </span>
+              <div>
+                <p className="font-semibold text-[#1e1147]">Create your UniEra account</p>
+                <p className="text-xs text-slate-500">Your email (in Personal details below) + a password. You&apos;ll use these to log in.</p>
+              </div>
+            </div>
+            <Link to="/login" state={{ from: "/enroll" }} className="text-sm text-[#7c3aed] font-medium hover:underline">
+              Already have an account? Log in
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Password *">
+              <input type="password" className={inputCls} value={account.password} autoComplete="new-password"
+                onChange={(e) => setAccount({ ...account, password: e.target.value })} placeholder="At least 6 characters" />
+            </Field>
+            <Field label="Confirm password *">
+              <input type="password" className={inputCls} value={account.confirm_password} autoComplete="new-password"
+                onChange={(e) => setAccount({ ...account, confirm_password: e.target.value })} />
+            </Field>
+          </div>
+        </Card>
+      )}
       {SECTIONS.map((s, i) => (
         <Section key={s.title} icon={s.icon} title={s.title} index={i} open={open === i} onToggle={() => setOpen(open === i ? -1 : i)}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -393,7 +459,17 @@ function ProfileStep({ user, hasProfile, onSaved, onSkip }) {
           <input type="checkbox" name="declaration_agreed" checked={form.declaration_agreed} onChange={change} className="mt-1" />
           I declare that the information provided above is true and accurate to the best of my knowledge.
         </label>
-        <Alert>{error}</Alert>
+        <Alert>
+          {error}
+          {emailTaken && (
+            <>
+              {" "}
+              <Link to="/login" state={{ from: "/enroll" }} className="font-semibold underline">
+                Log in to continue enrolling
+              </Link>
+            </>
+          )}
+        </Alert>
         <div className="flex flex-wrap justify-between gap-3">
           {hasProfile ? (
             <Button type="button" variant="ghost" onClick={onSkip}>

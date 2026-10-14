@@ -1,0 +1,14 @@
+# Copy these lines into /etc/ansible/hosts on your Ansible_Server (EC2)
+# Replace the IP with the PUBLIC IP of your uniera_host1 instance and the key name with yours.
+
+[uniera_servers]
+server1 ansible_host=13.xx.xx.xx
+
+[uniera_servers:vars]
+ansible_python_interpreter=/usr/bin/python3
+ansible_user=ubuntu
+ansible_ssh_private_key_file=/home/ubuntu/keys/YOUR_KEY.pem
+
+# ---- No AWS? Run everything on your own Ubuntu (WSL) instead: use this group and comment the one above
+# [uniera_servers]
+# localhost ansible_connection=local
