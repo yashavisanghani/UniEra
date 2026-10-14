@@ -21,7 +21,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 // change this URL to YOUR GitHub repo
-                git branch: 'main', url: 'https://github.com/YOUR-USERNAME/UniEra.git'
+                git branch: 'main', url: 'https://github.com/yashavisanghani/UniEra.git'
             }
         }
 
